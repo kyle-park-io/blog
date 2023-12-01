@@ -1,0 +1,12 @@
+{
+  "name": "blog",
+  "version": "1.0.0",
+  "repository": "git@kyle-park-io:kyle-park-io/blog.git",
+  "license": "MIT",
+  "main": "index.js",
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.2",
+    "@commitlint/config-conventional": "^18.4.2",
+    "husky": "^8.0.3"
+  }
+}
