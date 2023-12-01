@@ -1,0 +1,8 @@
+* * * * * /blog/scripts/cron-update-blog.sh
+
+# 0 */2 * * * /usr/src/app/scripts/cron-update-blog.sh 
+
+
+
+
+
