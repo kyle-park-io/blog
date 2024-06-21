@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "repository": "git@kyle-park-io:kyle-park-io/blog.git",
   "license": "MIT",
+  "author": "kyle-park-io <andy3638@naver.com>",
   "main": "index.js",
+  "scripts": {
+    "husky-postinstall": "husky install"
+  },
   "devDependencies": {
     "@commitlint/cli": "^18.4.2",
     "@commitlint/config-conventional": "^18.4.2",
-    "husky": "^8.0.3"
+    "husky": "^8.0.3",
+    "sort-package-json": "^2.10.0"
   }
 }
