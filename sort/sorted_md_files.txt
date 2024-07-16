@@ -9,5 +9,5 @@
 "cron.md",
 "test.md",
 "package.md",
-"a.md",
+"a.md"
 ]

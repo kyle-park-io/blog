@@ -13,6 +13,8 @@ git ls-files md | while read file; do
     echo "$last_commit_date $filename"
 done | sort -r | awk '{print "\""$4"\","}' >>$output_file
 
+sed -i '$ s/,$//' $output_file
+
 echo "]" >>$output_file
 
 echo "[" >$output_10_file
@@ -22,6 +24,8 @@ git ls-files md | while read file; do
     filename=$(basename "$file")
     echo "$last_commit_date $filename"
 done | sort -r | head -n 10 | awk '{print "\""$4"\","}' >>$output_10_file
+
+sed -i '$ s/,$//' $output_10_file
 
 echo "]" >>$output_10_file
 

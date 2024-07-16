@@ -8,5 +8,5 @@
 "eth.md",
 "cron.md",
 "test.md",
-"package.md",
+"package.md"
 ]
