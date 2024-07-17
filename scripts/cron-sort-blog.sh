@@ -1,5 +1,7 @@
 #!/bin/sh
 
+cd /blog || exit 1
+
 mkdir -p sort
 
 output_file="sort/sorted_md_files.txt"
