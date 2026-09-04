@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 
 const SCRIPT = resolve('scripts/cron-update-blog.sh');
 
-function git(cwd, args) {
+function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
 }
 
@@ -85,7 +85,12 @@ function sandbox() {
   };
 }
 
-const run = (env) => {
+interface RunResult {
+  ok: boolean;
+  output: string;
+}
+
+const run = (env: NodeJS.ProcessEnv): RunResult => {
   try {
     return {
       ok: true,
@@ -96,11 +101,16 @@ const run = (env) => {
       }),
     };
   } catch (err) {
-    return { ok: false, output: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+    // execFileSync throws an Error carrying the child's captured streams.
+    const failure = err as { stdout?: string; stderr?: string };
+    return {
+      ok: false,
+      output: `${failure.stdout ?? ''}${failure.stderr ?? ''}`,
+    };
   }
 };
 
-const buildCount = (box) => {
+const buildCount = (box: { counter: string }): number => {
   if (!existsSync(box.counter)) return 0;
   return readFileSync(box.counter, 'utf8').split('\n').filter(Boolean).length;
 };

@@ -1,7 +1,7 @@
 # Writing a post
 
 One post is one directory: `content/posts/<slug>/index.md`. The directory name
-is the URL — `content/posts/ethereum-event-object` is served at
+is the URL - `content/posts/ethereum-event-object` is served at
 `https://jungho.dev/blog/ethereum-event-object`. Slugs are lowercase
 kebab-case and must not change after publishing; changing one breaks every
 link to the post.
@@ -45,5 +45,22 @@ key, a malformed date, an uppercase tag, a missing cover file, or an `# ` in
 the body. After `git push`, the site's cron picks the change up within ten
 minutes, rebuilds, and swaps the output in. No deploy is needed.
 
-If a post does not appear, the build rejected it — the previous version of the
+If a post does not appear, the build rejected it. The previous version of the
 site stays up on purpose. Check the pod logs for the astro build output.
+
+## Tooling
+
+Everything in `scripts/` and `__tests__/` is TypeScript, run directly by node
+(>= 22.18), which strips the annotations at load. Nothing is compiled, so no
+build step stands between an edit and a run.
+
+    yarn validate    # the same check the pre-commit hook runs
+    yarn test        # node --test over __tests__/*.test.ts
+    yarn typecheck   # tsc --noEmit; node strips types, it never checks them
+
+`yarn typecheck` is not called `check`: yarn 1 has a builtin of that name and
+would run its own dependency-tree check instead of the script.
+
+Because node only strips types, `tsconfig.json` sets `erasableSyntaxOnly` so
+tsc rejects syntax that would need a real transform (enums, namespaces,
+parameter properties) rather than letting it reach node and fail there.

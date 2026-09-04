@@ -4,17 +4,20 @@
   "repository": "git@kyle-park-io:kyle-park-io/blog.git",
   "license": "MIT",
   "author": "kyle-park-io <andy3638@naver.com>",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "husky-postinstall": "husky install",
-    "test": "node --test __tests__/*.test.mjs",
-    "validate": "node scripts/validate-frontmatter.mjs content/posts"
+    "test": "node --test __tests__/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "validate": "node scripts/validate-frontmatter.ts content/posts"
   },
   "devDependencies": {
     "@commitlint/cli": "^18.4.2",
     "@commitlint/config-conventional": "^18.4.2",
+    "@types/node": "^22.10.2",
     "husky": "^8.0.3",
-    "sort-package-json": "^2.10.0"
+    "sort-package-json": "^2.10.0",
+    "typescript": "5.9.3"
   },
   "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }

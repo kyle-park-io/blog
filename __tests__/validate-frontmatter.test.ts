@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validatePosts } from '../scripts/validate-frontmatter.mjs';
+import { validatePosts } from '../scripts/validate-frontmatter.ts';
 
-const withPosts = (posts, run) => {
+const withPosts = <T,>(
+  posts: Record<string, string>,
+  run: (root: string) => T,
+): T => {
   const root = mkdtempSync(join(tmpdir(), 'blog-validate-'));
   for (const [slug, body] of Object.entries(posts)) {
     mkdirSync(join(root, slug), { recursive: true });

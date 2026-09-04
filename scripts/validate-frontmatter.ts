@@ -4,28 +4,37 @@
 // This mirrors the zod schema in kyle-server's packages/blog-site/src/
 // content.config.ts. The build is the hard gate; this hook exists so a typo
 // fails at commit time instead of showing up as a silently missing post ten
-// minutes later. No dependencies on purpose — it runs from a bare checkout.
+// minutes later. No runtime dependencies on purpose - it runs from a bare
+// checkout, and node strips the types itself (node >= 22.18; this repo runs
+// on node 24).
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const REQUIRED = ['title', 'date', 'summary', 'tags'];
-const OPTIONAL = ['updated', 'cover', 'draft', 'lang'];
-const KNOWN = new Set([...REQUIRED, ...OPTIONAL]);
+/** A frontmatter value is a scalar or, for `tags`, a list. */
+type FieldValue = string | string[];
+type Fields = Record<string, FieldValue>;
+
+const REQUIRED = ['title', 'date', 'summary', 'tags'] as const;
+const OPTIONAL = ['updated', 'cover', 'draft', 'lang'] as const;
+const KNOWN: ReadonlySet<string> = new Set<string>([...REQUIRED, ...OPTIONAL]);
 // Array-typed fields that may be written as an empty YAML block sequence
 // (a bare `key:` line followed by no `- item` lines), which we treat as `[]`.
-const ARRAY_FIELDS = new Set(['tags']);
+const ARRAY_FIELDS: ReadonlySet<string> = new Set(['tags']);
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Minimal frontmatter reader: `key: value` pairs, `[a, b]` arrays, and
  *  YAML block sequences (`key:` followed by `- item` lines). */
-function parseFrontmatter(raw) {
+function parseFrontmatter(raw: string): {
+  fields: Fields | null;
+  body: string;
+} {
   if (!raw.startsWith('---\n')) return { fields: null, body: raw };
   const end = raw.indexOf('\n---', 4);
   if (end === -1) return { fields: null, body: raw };
 
-  const fields = {};
+  const fields: Fields = {};
   const lines = raw.slice(4, end).split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -33,11 +42,11 @@ function parseFrontmatter(raw) {
     const colon = line.indexOf(':');
     if (colon === -1) continue;
     const key = line.slice(0, colon).trim();
-    let value = line.slice(colon + 1).trim();
+    const rawValue = line.slice(colon + 1).trim();
 
-    if (value === '') {
+    if (rawValue === '') {
       // Possible YAML block sequence: a `key:` line followed by `- item` lines.
-      const items = [];
+      const items: string[] = [];
       let j = i + 1;
       while (j < lines.length && /^\s*-(\s|$)/.test(lines[j])) {
         items.push(lines[j].replace(/^\s*-\s*/, '').trim());
@@ -50,14 +59,15 @@ function parseFrontmatter(raw) {
       }
     }
 
-    if (value.startsWith('[') && value.endsWith(']')) {
-      value = value
+    if (rawValue.startsWith('[') && rawValue.endsWith(']')) {
+      fields[key] = rawValue
         .slice(1, -1)
         .split(',')
         .map((v) => v.trim())
         .filter((v) => v !== '');
+    } else {
+      fields[key] = rawValue;
     }
-    fields[key] = value;
   }
   return { fields, body: raw.slice(end + 4) };
 }
@@ -73,13 +83,13 @@ function parseFrontmatter(raw) {
  *
  * Follows the CommonMark rule: a fence opens on a line whose first
  * non-whitespace run is three or more backticks, and only a *closing*
- * line — backticks only, nothing else but whitespace — whose run is at
+ * line - backticks only, nothing else but whitespace - whose run is at
  * least as long as the opener's closes it. A fence left open at end of
  * input simply never closes, so everything after it counts as fenced.
  */
-function stripFencedCode(body) {
+function stripFencedCode(body: string): string {
   const lines = body.split('\n');
-  const kept = [];
+  const kept: string[] = [];
   let fenceLength = 0; // 0 = not currently inside a fence
 
   for (const line of lines) {
@@ -97,8 +107,8 @@ function stripFencedCode(body) {
     if (close && close[1].length >= fenceLength) {
       fenceLength = 0;
     }
-    // Every line strictly inside the fence — including its own open/close
-    // delimiter lines — is never a candidate for the h1 check.
+    // Every line strictly inside the fence - including its own open/close
+    // delimiter lines - is never a candidate for the h1 check.
   }
 
   return kept.join('\n');
@@ -107,7 +117,7 @@ function stripFencedCode(body) {
 /** True if `value` is `YYYY-MM-DD` for a date that actually exists on the
  *  calendar (rejects e.g. 2024-02-30 and 2024-13-45, which `new Date()`
  *  would otherwise silently normalize instead of rejecting). */
-function isRealCalendarDate(value) {
+function isRealCalendarDate(value: string): boolean {
   const match = ISO_DATE.exec(value);
   if (!match) return false;
   const year = Number(match[1]);
@@ -121,19 +131,19 @@ function isRealCalendarDate(value) {
   );
 }
 
-export function validatePosts(root) {
-  const errors = [];
+export function validatePosts(root: string): string[] {
+  const errors: string[] = [];
   if (!existsSync(root)) return [`content directory missing: ${root}`];
 
   const slugs = readdirSync(root).filter((name) =>
     statSync(join(root, name)).isDirectory(),
   );
 
-  const seen = new Set();
+  const seen = new Set<string>();
   for (const slug of slugs) {
     const file = join(slug, 'index.md');
     const path = join(root, file);
-    const at = (msg) => errors.push(`${file}: ${msg}`);
+    const at = (msg: string): number => errors.push(`${file}: ${msg}`);
 
     if (!KEBAB.test(slug))
       at(`directory name "${slug}" must be lowercase kebab-case`);
@@ -159,11 +169,14 @@ export function validatePosts(root) {
       if (!KNOWN.has(key)) at(`unknown frontmatter key: ${key}`);
     }
 
-    for (const key of ['date', 'updated']) {
+    for (const key of ['date', 'updated'] as const) {
       const value = fields[key];
       if (value === undefined) continue;
-      if (!ISO_DATE.test(value)) {
-        at(`${key} must be YYYY-MM-DD, got "${value}"`);
+      // A date written as a YAML list is already wrong; report it as a
+      // format error rather than letting String() flatten it into
+      // something that could accidentally pass the ISO test.
+      if (typeof value !== 'string' || !ISO_DATE.test(value)) {
+        at(`${key} must be YYYY-MM-DD, got "${String(value)}"`);
       } else if (!isRealCalendarDate(value)) {
         at(`${key} is not a real calendar date: "${value}"`);
       }
@@ -180,35 +193,38 @@ export function validatePosts(root) {
       }
     }
 
-    if (fields.lang !== undefined && !['ko', 'en'].includes(fields.lang)) {
-      at(`lang must be ko or en, got "${fields.lang}"`);
+    const lang = fields.lang;
+    if (lang !== undefined && (typeof lang !== 'string' || !['ko', 'en'].includes(lang))) {
+      at(`lang must be ko or en, got "${String(lang)}"`);
     }
 
+    const draft = fields.draft;
     if (
-      fields.draft !== undefined &&
-      !['true', 'false'].includes(fields.draft)
+      draft !== undefined &&
+      (typeof draft !== 'string' || !['true', 'false'].includes(draft))
     ) {
-      at(`draft must be true or false, got "${fields.draft}"`);
+      at(`draft must be true or false, got "${String(draft)}"`);
     }
 
-    if (fields.cover !== undefined) {
-      const rel = String(fields.cover).replace(/^\.\//, '');
+    const cover = fields.cover;
+    if (cover !== undefined) {
+      const rel = String(cover).replace(/^\.\//, '');
       if (!existsSync(join(root, slug, rel)))
-        at(`cover file not found: ${fields.cover}`);
+        at(`cover file not found: ${String(cover)}`);
     }
 
-    // Strip fenced code blocks before checking for a stray h1 — a shell
+    // Strip fenced code blocks before checking for a stray h1 - a shell
     // comment like `# install deps` inside a ```sh fence is not a heading.
     const prose = stripFencedCode(body);
     if (/^# /m.test(prose)) {
-      at('body must not contain an h1 (# ) — the title comes from frontmatter');
+      at('body must not contain an h1 (# ) - the title comes from frontmatter');
     }
   }
 
   return errors;
 }
 
-const isMain = process.argv[1]?.endsWith('validate-frontmatter.mjs');
+const isMain = process.argv[1]?.endsWith('validate-frontmatter.ts') === true;
 if (isMain) {
   const root = process.argv[2] ?? 'content/posts';
   const errors = validatePosts(root);
