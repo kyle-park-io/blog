@@ -6,7 +6,9 @@
   "author": "kyle-park-io <andy3638@naver.com>",
   "main": "index.js",
   "scripts": {
-    "husky-postinstall": "husky install"
+    "husky-postinstall": "husky install",
+    "test": "node --test __tests__/*.test.mjs",
+    "validate": "node scripts/validate-frontmatter.mjs content/posts"
   },
   "devDependencies": {
     "@commitlint/cli": "^18.4.2",
