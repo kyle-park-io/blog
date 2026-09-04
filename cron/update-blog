@@ -1,5 +1,1 @@
-*/10 * * * * /blog/scripts/cron-update-blog.sh
-
-*/10 * * * * /blog/scripts/cron-sort-blog.sh
-
-0 0 * * * echo "Cron Cron ~ : $(date)" >> /tmp/cron_date.log
+*/10 * * * * /blog/scripts/cron-update-blog.sh >> /var/log/update-blog.log 2>&1
