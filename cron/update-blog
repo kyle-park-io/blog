@@ -1,1 +1,8 @@
+# Belt-and-braces: Debian cron gives jobs PATH=/usr/bin:/bin and does not
+# inherit the daemon's environment, so npm/node under /usr/local/bin would
+# otherwise be invisible to this job. build-blog.sh sets its own PATH too,
+# but a crontab-level PATH keeps cron-update-blog.sh's own `git` calls (and
+# anything else this job runs directly) covered as well.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 */10 * * * * /blog/scripts/cron-update-blog.sh >> /var/log/update-blog.log 2>&1
