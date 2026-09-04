@@ -103,6 +103,34 @@ test('a fenced code block at the end of the file with no trailing newline is not
   });
 });
 
+test('an unterminated fence containing a # comment is not reported (gap A)', () => {
+  // The fence never closes: everything after the opener, to the end of the
+  // file, must be treated as still inside it.
+  const unterminated = `${valid}\n\`\`\`sh\n# comment\nyarn install\n`;
+  withPosts({ 'unterminated-fence': unterminated }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+test('a four-backtick fence with an embedded triple-backtick span is not reported (gap B)', () => {
+  // The outer fence opens with 4 backticks and contains a literal ``` span
+  // (e.g. documenting markdown syntax); only a closing run of >=4 backticks
+  // may end it, so the embedded triple must not close it early.
+  const nested = [
+    valid,
+    '',
+    '````markdown',
+    '```js',
+    '# comment',
+    '```',
+    '````',
+    '',
+  ].join('\n');
+  withPosts({ 'nested-fence': nested }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
 // --- Finding 2: tags may be written as a YAML block sequence. ---
 
 test('tags written as a YAML block sequence produce no errors', () => {

@@ -62,6 +62,48 @@ function parseFrontmatter(raw) {
   return { fields, body: raw.slice(end + 4) };
 }
 
+/**
+ * Returns `body` with fenced code blocks removed, so headings can be
+ * checked against prose only. A line-based scan, not a regex, because a
+ * regex like /```[\s\S]*?```/ gets fenced code wrong in two ways: it never
+ * closes on a truly unterminated fence (leaving everything after it
+ * unstripped instead of treating it as still-fenced), and it closes early
+ * on a fence opened with four-or-more backticks that embeds a literal
+ * triple-backtick span (the entire reason longer fences exist).
+ *
+ * Follows the CommonMark rule: a fence opens on a line whose first
+ * non-whitespace run is three or more backticks, and only a *closing*
+ * line — backticks only, nothing else but whitespace — whose run is at
+ * least as long as the opener's closes it. A fence left open at end of
+ * input simply never closes, so everything after it counts as fenced.
+ */
+function stripFencedCode(body) {
+  const lines = body.split('\n');
+  const kept = [];
+  let fenceLength = 0; // 0 = not currently inside a fence
+
+  for (const line of lines) {
+    if (fenceLength === 0) {
+      const open = /^\s*(`{3,})/.exec(line);
+      if (open) {
+        fenceLength = open[1].length;
+      } else {
+        kept.push(line);
+      }
+      continue;
+    }
+
+    const close = /^\s*(`{3,})\s*$/.exec(line);
+    if (close && close[1].length >= fenceLength) {
+      fenceLength = 0;
+    }
+    // Every line strictly inside the fence — including its own open/close
+    // delimiter lines — is never a candidate for the h1 check.
+  }
+
+  return kept.join('\n');
+}
+
 /** True if `value` is `YYYY-MM-DD` for a date that actually exists on the
  *  calendar (rejects e.g. 2024-02-30 and 2024-13-45, which `new Date()`
  *  would otherwise silently normalize instead of rejecting). */
@@ -157,7 +199,7 @@ export function validatePosts(root) {
 
     // Strip fenced code blocks before checking for a stray h1 — a shell
     // comment like `# install deps` inside a ```sh fence is not a heading.
-    const prose = body.replace(/```[\s\S]*?```/g, '');
+    const prose = stripFencedCode(body);
     if (/^# /m.test(prose)) {
       at('body must not contain an h1 (# ) — the title comes from frontmatter');
     }
