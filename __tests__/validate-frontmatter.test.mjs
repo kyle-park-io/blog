@@ -79,3 +79,75 @@ test('an unknown frontmatter key is reported', () => {
     assert.match(validatePosts(root)[0], /author/);
   });
 });
+
+// --- Finding 1: the h1 check must not fire on code-fence content. ---
+
+test('an h1-looking comment inside a fenced code block is not reported', () => {
+  const withFence = `${valid}\n\`\`\`sh\n# install deps\nyarn install\n\`\`\`\n`;
+  withPosts({ 'fenced-comment': withFence }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+test('a real h1 in the body is still reported even when the post also has a fence', () => {
+  const withFence = `${valid}\n\`\`\`sh\n# install deps\n\`\`\`\n\n# 제목\n`;
+  withPosts({ 'fence-plus-h1': withFence }, (root) => {
+    assert.match(validatePosts(root)[0], /h1|# /);
+  });
+});
+
+test('a fenced code block at the end of the file with no trailing newline is not reported', () => {
+  const withFence = `${valid}\n\`\`\`sh\n# install deps\n\`\`\``;
+  withPosts({ 'fenced-eof': withFence }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+// --- Finding 2: tags may be written as a YAML block sequence. ---
+
+test('tags written as a YAML block sequence produce no errors', () => {
+  const blockTags = valid.replace(
+    'tags: [ethereum, dev-tools]',
+    'tags:\n  - ethereum\n  - dev-tools',
+  );
+  withPosts({ 'block-tags': blockTags }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+test('an empty inline tag list produces no errors', () => {
+  const emptyInline = valid.replace('tags: [ethereum, dev-tools]', 'tags: []');
+  withPosts({ 'empty-inline-tags': emptyInline }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+test('an empty tags key with no block items produces no errors', () => {
+  const emptyBlock = valid.replace('tags: [ethereum, dev-tools]', 'tags:');
+  withPosts({ 'empty-block-tags': emptyBlock }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});
+
+// --- Finding 3: date must be a real calendar date, not just YYYY-MM-DD shaped. ---
+
+test('an impossible month is reported', () => {
+  const bad = valid.replace('date: 2024-09-05', 'date: 2024-13-01');
+  withPosts({ 'bad-month': bad }, (root) => {
+    assert.match(validatePosts(root)[0], /date/);
+  });
+});
+
+test('an impossible day is reported', () => {
+  const bad = valid.replace('date: 2024-09-05', 'date: 2024-02-30');
+  withPosts({ 'bad-day': bad }, (root) => {
+    assert.match(validatePosts(root)[0], /date/);
+  });
+});
+
+test('a valid leap day produces no errors', () => {
+  const leap = valid.replace('date: 2024-09-05', 'date: 2024-02-29');
+  withPosts({ 'leap-day': leap }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});

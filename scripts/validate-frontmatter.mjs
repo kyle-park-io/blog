@@ -12,22 +12,44 @@ import { join } from 'node:path';
 const REQUIRED = ['title', 'date', 'summary', 'tags'];
 const OPTIONAL = ['updated', 'cover', 'draft', 'lang'];
 const KNOWN = new Set([...REQUIRED, ...OPTIONAL]);
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// Array-typed fields that may be written as an empty YAML block sequence
+// (a bare `key:` line followed by no `- item` lines), which we treat as `[]`.
+const ARRAY_FIELDS = new Set(['tags']);
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-/** Minimal frontmatter reader: `key: value` pairs, `[a, b]` arrays. */
+/** Minimal frontmatter reader: `key: value` pairs, `[a, b]` arrays, and
+ *  YAML block sequences (`key:` followed by `- item` lines). */
 function parseFrontmatter(raw) {
   if (!raw.startsWith('---\n')) return { fields: null, body: raw };
   const end = raw.indexOf('\n---', 4);
   if (end === -1) return { fields: null, body: raw };
 
   const fields = {};
-  for (const line of raw.slice(4, end).split('\n')) {
+  const lines = raw.slice(4, end).split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (line.trim() === '') continue;
     const colon = line.indexOf(':');
     if (colon === -1) continue;
     const key = line.slice(0, colon).trim();
     let value = line.slice(colon + 1).trim();
+
+    if (value === '') {
+      // Possible YAML block sequence: a `key:` line followed by `- item` lines.
+      const items = [];
+      let j = i + 1;
+      while (j < lines.length && /^\s*-(\s|$)/.test(lines[j])) {
+        items.push(lines[j].replace(/^\s*-\s*/, '').trim());
+        j++;
+      }
+      if (items.length > 0 || ARRAY_FIELDS.has(key)) {
+        fields[key] = items;
+        i = j - 1;
+        continue;
+      }
+    }
+
     if (value.startsWith('[') && value.endsWith(']')) {
       value = value
         .slice(1, -1)
@@ -38,6 +60,23 @@ function parseFrontmatter(raw) {
     fields[key] = value;
   }
   return { fields, body: raw.slice(end + 4) };
+}
+
+/** True if `value` is `YYYY-MM-DD` for a date that actually exists on the
+ *  calendar (rejects e.g. 2024-02-30 and 2024-13-45, which `new Date()`
+ *  would otherwise silently normalize instead of rejecting). */
+function isRealCalendarDate(value) {
+  const match = ISO_DATE.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  );
 }
 
 export function validatePosts(root) {
@@ -80,8 +119,11 @@ export function validatePosts(root) {
 
     for (const key of ['date', 'updated']) {
       const value = fields[key];
-      if (value !== undefined && !ISO_DATE.test(value)) {
+      if (value === undefined) continue;
+      if (!ISO_DATE.test(value)) {
         at(`${key} must be YYYY-MM-DD, got "${value}"`);
+      } else if (!isRealCalendarDate(value)) {
+        at(`${key} is not a real calendar date: "${value}"`);
       }
     }
 
@@ -113,7 +155,10 @@ export function validatePosts(root) {
         at(`cover file not found: ${fields.cover}`);
     }
 
-    if (/^# /m.test(body)) {
+    // Strip fenced code blocks before checking for a stray h1 — a shell
+    // comment like `# install deps` inside a ```sh fence is not a heading.
+    const prose = body.replace(/```[\s\S]*?```/g, '');
+    if (/^# /m.test(prose)) {
       at('body must not contain an h1 (# ) — the title comes from frontmatter');
     }
   }
