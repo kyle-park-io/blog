@@ -16,7 +16,7 @@ type FieldValue = string | string[];
 type Fields = Record<string, FieldValue>;
 
 const REQUIRED = ['title', 'date', 'summary', 'tags'] as const;
-const OPTIONAL = ['updated', 'cover', 'draft', 'lang'] as const;
+const OPTIONAL = ['updated', 'cover', 'draft', 'lang', 'archived', 'supersededBy'] as const;
 const KNOWN: ReadonlySet<string> = new Set<string>([...REQUIRED, ...OPTIONAL]);
 // Array-typed fields that may be written as an empty YAML block sequence
 // (a bare `key:` line followed by no `- item` lines), which we treat as `[]`.
@@ -204,6 +204,29 @@ export function validatePosts(root: string): string[] {
       (typeof draft !== 'string' || !['true', 'false'].includes(draft))
     ) {
       at(`draft must be true or false, got "${String(draft)}"`);
+    }
+
+    const archived = fields.archived;
+    if (
+      archived !== undefined &&
+      (typeof archived !== 'string' || !['true', 'false'].includes(archived))
+    ) {
+      at(`archived must be true or false, got "${String(archived)}"`);
+    }
+
+    // supersededBy names the post that replaces an archived one. The site
+    // links it from the archived copy and fails the build on a slug that is
+    // not a post, so catch that here first.
+    const next = fields.supersededBy;
+    if (next !== undefined) {
+      if (typeof next !== 'string' || !KEBAB.test(next)) {
+        at(`supersededBy must be a post slug, got "${String(next)}"`);
+      } else if (next === slug) {
+        at('supersededBy must name another post');
+      } else if (!existsSync(join(root, next, 'index.md'))) {
+        at(`supersededBy names no post: ${next}`);
+      }
+      if (archived !== 'true') at('supersededBy is only for an archived post (archived: true)');
     }
 
     const cover = fields.cover;

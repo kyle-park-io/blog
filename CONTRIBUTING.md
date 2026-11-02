@@ -27,6 +27,8 @@ Images live next to the post and are referenced relatively:
 | `cover`   | no       | `./cover.webp`. The file must exist                                                |
 | `draft`   | no       | `true` hides it from the published site                                            |
 | `lang`    | no       | `ko` (default) or `en`                                                             |
+| `archived` | no      | `true` takes the post off the list, tags, RSS and sitemap and serves it at `/blog/archive/<slug>` |
+| `supersededBy` | no  | Slug of the post that replaces an archived one. Linked from the archived copy        |
 
 Example:
 
@@ -37,6 +39,21 @@ Example:
     tags: [ethereum, ethers]
     lang: ko
     ---
+
+## Archiving a post
+
+Archive a post instead of deleting it when it is a test post or a newer post
+replaces it. Add `archived: true` (and `supersededBy: <new-slug>` when a newer
+post exists). The post is then:
+
+- served unchanged at `https://jungho.dev/blog/archive/<slug>`, with a notice
+  above the body and a `noindex` robots tag;
+- gone from `/blog`, the tag pages, `rss.xml`, `index.json` and the sitemap;
+- still reachable at its old address, which now forwards to the archive copy,
+  so links already shared keep working.
+
+Do not change the slug or the body of an archived post. A rewrite is a new
+post with its own slug, for example `chain-communicator-v2`.
 
 ## Publishing
 

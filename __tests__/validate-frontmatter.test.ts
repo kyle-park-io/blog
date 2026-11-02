@@ -182,3 +182,47 @@ test('a valid leap day produces no errors', () => {
     assert.deepEqual(validatePosts(root), []);
   });
 });
+
+const archivedPost = (extra: string) => `---
+title: 보관한 글
+date: 2023-12-01
+summary: 요약
+tags: [ethereum]
+archived: true
+${extra}---
+
+본문
+`;
+
+test('an archived post that names its replacement produces no errors', () => {
+  withPosts(
+    { 'old-post': archivedPost('supersededBy: good-post\n'), 'good-post': valid },
+    (root) => {
+      assert.deepEqual(validatePosts(root), []);
+    },
+  );
+});
+
+test('archived must be true or false', () => {
+  withPosts({ 'old-post': valid.replace('lang: ko', 'archived: yes') }, (root) => {
+    assert.match(validatePosts(root)[0], /archived must be true or false/);
+  });
+});
+
+test('supersededBy naming no post is reported', () => {
+  withPosts({ 'old-post': archivedPost('supersededBy: missing-post\n') }, (root) => {
+    assert.match(validatePosts(root)[0], /supersededBy names no post: missing-post/);
+  });
+});
+
+test('supersededBy on a post that is not archived is reported', () => {
+  withPosts(
+    {
+      'good-post': valid,
+      'live-post': valid.replace('lang: ko', 'supersededBy: good-post'),
+    },
+    (root) => {
+      assert.match(validatePosts(root).join('\n'), /only for an archived post/);
+    },
+  );
+});
