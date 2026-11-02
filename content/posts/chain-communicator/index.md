@@ -4,6 +4,8 @@ date: 2024-09-05
 summary: 이더리움이 아닌 텐더민트 기반 네트워크를 대상으로, 트랜잭션 타입 정의부터 직렬화(Protobuf)·RLP 인코딩·서명·RPC 호출까지 라이브러리에 의존하지 않고 직접 구현해본 기록입니다.
 tags: [blockchain, architecture]
 lang: ko
+archived: true
+supersededBy: chain-communicator-v2
 ---
 
 - GITHUB

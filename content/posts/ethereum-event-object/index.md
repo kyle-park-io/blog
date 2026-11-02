@@ -4,6 +4,7 @@ date: 2023-12-01
 summary: ethers.js로 컨트랙트 이벤트를 구독할 때 콘솔에 찍히는 ContractEventPayload 객체 전체를 그대로 옮기고, 컨트랙트 주소·러너 등 핵심 필드에 짧은 화살표 설명을 붙인 참고용 스니펫입니다.
 tags: [ethereum, ethers, node]
 lang: ko
+archived: true
 ---
 
 ```jsx

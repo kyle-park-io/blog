@@ -4,6 +4,8 @@ date: 2024-09-05
 summary: 새 프로젝트나 팀에 합류했을 때 코드 스타일과 커밋 규칙을 지키게 만드는 방법을, EditorConfig·Prettier·ESLint·commitlint·husky 설정 예시와 함께 정리했습니다.
 tags: [dev-tools, conventions, onboarding]
 lang: ko
+archived: true
+supersededBy: project-initial-setup-v2
 ---
 
 - GITHUB
