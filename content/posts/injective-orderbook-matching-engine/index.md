@@ -5,6 +5,7 @@ summary: 'How Injective matches thousands of trades per block fully on-chain, wa
 tags: [injective, orderbook, matching-engine, cosmos]
 lang: en
 cover: ./cover.jpg
+updated: 2026-11-03
 ---
 > 📖 This is the condensed version. The full technical deep dive, with the code examples in full, is on Medium: [Deep Dive into Injective's Orderbook Matching Engine](https://kyle-park-io.medium.com/deep-dive-into-injectives-orderbook-matching-engine-57642e67e101) — [한국어판](https://kyle-park-io.medium.com/injective-%EC%98%A4%EB%8D%94%EB%B6%81-%EB%A7%A4%EC%B9%AD-%EC%97%94%EC%A7%84-%EC%8B%AC%EC%B8%B5-%EB%B6%84%EC%84%9D-47dfc279c17d)
 
@@ -12,6 +13,9 @@ cover: ./cover.jpg
 
 > **※ CHANGE LOG (2026–02–13)**
 A new release version has been added to the changelog and the branch has been changed from **blob/master** to **tree/release/v1.18.x**
+
+> **※ CHANGE LOG (2026-11-03)**
+Injective moved the source out of `master` in February 2026 and has kept new source private since 2026-09-09, so the `master` links stopped working. Every code link now points to commit [`c7b042e`](https://github.com/InjectiveFoundation/injective-core/tree/c7b042e2b880bb49c8882f28627a1a6ee11a6e30) from 2025-12-17, the `master` version this post walks through, so the line numbers match the text.
 
 ## Introduction
 
@@ -68,7 +72,7 @@ Injective uses Cosmos SDK's ABCI (Application Blockchain Interface) to process a
 1. Batch processing - handle multiple orders efficiently
 1. Parallel execution - each market can be processed independently
 
-📍 Code: [`abci.go:84-146`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/abci.go#L84-L146)
+📍 Code: [`abci.go:84-146`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/abci.go#L84-L146)
 
 The EndBlocker processes spot and derivatives markets in parallel using goroutines:
 
@@ -112,7 +116,7 @@ type SpotMarket struct {
 }
 ```
 
-📍 Code: [`market.pb.go:260`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/types/v2/market.pb.go#L260)
+📍 Code: [`market.pb.go:260`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/types/v2/market.pb.go#L260)
 
 ### Derivatives Markets
 
@@ -132,7 +136,7 @@ type DerivativeMarket struct {
 }
 ```
 
-📍 Code: [`market.pb.go:479`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/types/v2/market.pb.go#L479)
+📍 Code: [`market.pb.go:479`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/types/v2/market.pb.go#L479)
 
 ---
 
@@ -148,7 +152,7 @@ func (b *DerivativeLimitOrderbook) IsPerpetual() bool {
 }
 ```
 
-📍 Code: [`derivative_limit_orderbook.go:201-203`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L201-L203)
+📍 Code: [`derivative_limit_orderbook.go:201-203`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L201-L203)
 
 - **Perpetual**: Has funding rate mechanism (funding != nil)
 - **Expiry**: No funding, expires at specific date
@@ -167,7 +171,7 @@ Injective implements the **Price-Time Priority** algorithm - the same algorithm 
 1. **Time priority**: For orders at the same price, earlier orders fill first
 1. **Partial fills**: Orders can be partially filled across multiple matches
 
-📍 Code: [`spot_limit_order_matcher.go:166-192`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/ordermatching/spot_limit_order_matcher.go#L166-L192)
+📍 Code: [`spot_limit_order_matcher.go:166-192`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/ordermatching/spot_limit_order_matcher.go#L166-L192)
 
 ```go
 func (o *SpotLimitOrderbook) advanceNewOrder(
@@ -190,7 +194,7 @@ func (o *SpotLimitOrderbook) advanceNewOrder(
 
 For spot markets, the clearing price is simply the midpoint between the best buy and sell orders.
 
-📍 Code: [`spot_limit_order_processor.go:94-113`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L94-L113)
+📍 Code: [`spot_limit_order_processor.go:94-113`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L94-L113)
 
 ```go
 if lastBuyPrice.LTE(midMarketPrice) {
@@ -206,7 +210,7 @@ return midMarketPrice
 
 Derivatives markets use a more sophisticated approach with **mark price fallback** to prevent manipulation:
 
-📍 Code: [`derivative_orders_processor.go:30-44`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_orders_processor.go#L30-L44)
+📍 Code: [`derivative_orders_processor.go:30-44`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_orders_processor.go#L30-L44)
 
 ```go
 func GetRegularClearingPrice(
@@ -242,7 +246,7 @@ This prevents price manipulation in thin markets by falling back to oracle-based
 
 Limit orders are matched against the resting orderbook:
 
-📍 Code: [`spot_limit_order_processor.go:65-92`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L65-L92)
+📍 Code: [`spot_limit_order_processor.go:65-92`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L65-L92)
 
 ```go
 for {
@@ -266,7 +270,7 @@ for {
 
 Market orders are matched immediately at the best available prices:
 
-📍 Code: [`spot_limit_order_processor.go:151-181`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L151-L181)
+📍 Code: [`spot_limit_order_processor.go:151-181`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/spot_limit_order_processor.go#L151-L181)
 
 Market orders consume liquidity from the orderbook until fully filled or liquidity is exhausted.
 
@@ -278,7 +282,7 @@ Market orders consume liquidity from the orderbook until fully filled or liquidi
 
 Derivatives markets track positions for each trader:
 
-📍 Code: [`derivative_limit_orderbook.go:334-382`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L334-L382)
+📍 Code: [`derivative_limit_orderbook.go:334-382`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L334-L382)
 
 ```go
 // Check if order closes existing position
@@ -300,7 +304,7 @@ if isClosingPosition {
 
 For perpetual markets, funding rates are applied periodically:
 
-📍 Code: [`derivative_limit_orderbook.go:215-217`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L215-L217)
+📍 Code: [`derivative_limit_orderbook.go:215-217`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L215-L217)
 
 ```go
 if b.IsPerpetual() {
@@ -316,7 +320,7 @@ Funding rates balance long/short interest and keep perpetual prices anchored to 
 
 ### Spot Settlement
 
-📍 Code: [`spot_execution_limit.go:129-196`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/spot_execution_limit.go#L129-L196)
+📍 Code: [`spot_execution_limit.go:129-196`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/spot_execution_limit.go#L129-L196)
 
 1. Update account balances (base and quote assets)
 1. Apply fees (maker/taker)
@@ -326,7 +330,7 @@ Funding rates balance long/short interest and keep perpetual prices anchored to 
 
 ### Derivatives Settlement
 
-📍 Code: [`derivative_execution_market.go:67-139`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_execution_market.go#L67-L139)
+📍 Code: [`derivative_execution_market.go:67-139`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_execution_market.go#L67-L139)
 
 1. **Check market solvency** (insurance fund check)
 1. **Update positions** (increase/decrease/close)
@@ -348,13 +352,13 @@ Derivatives settlement is significantly more complex due to leverage, positions,
 
 Block-only data is stored in transient store (cleared after block):
 
-📍 Code: [`orderbook.go:30-52`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/orderbook.go#L30-L52)
+📍 Code: [`orderbook.go:30-52`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/orderbook.go#L30-L52)
 
 **2. Lazy Loading**
 
 Orders are only deserialized when needed:
 
-📍 Code: [`derivative_limit_orderbook.go:502-524`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L502-L524)
+📍 Code: [`derivative_limit_orderbook.go:502-524`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/derivative_limit_orderbook.go#L502-L524)
 
 ```go
 func (b *DerivativeLimitOrderbook) getRestingOrder() *DerivativeLimitOrder {
@@ -376,7 +380,7 @@ This minimizes memory usage and deserialization overhead.
 
 **3. Iterator-Based Traversal**
 
-📍 Code: [`orderbook.go:204-265`](https://github.com/InjectiveFoundation/injective-core/blob/master/injective-chain/modules/exchange/keeper/orderbook.go#L204-L265)
+📍 Code: [`orderbook.go:204-265`](https://github.com/InjectiveFoundation/injective-core/blob/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange/keeper/orderbook.go#L204-L265)
 
 Uses Cosmos SDK iterators to traverse orderbook without loading all orders into memory:
 
@@ -417,9 +421,9 @@ Injective proves that you CAN build a high-performance orderbook DEX fully on-ch
 
 📖<strong> Full Technical Deep Div</strong>e: [Medium Article Link](https://medium.com/@kyle-park-io/deep-dive-into-injectives-orderbook-matching-engine-57642e67e101)
 
-🔗<strong> GitHub Repositor</strong>y: [injective-core](https://github.com/InjectiveFoundation/injective-core)
+🔗<strong> GitHub Repositor</strong>y: [injective-core at c7b042e, 2025-12-17](https://github.com/InjectiveFoundation/injective-core/tree/c7b042e2b880bb49c8882f28627a1a6ee11a6e30)
 
-📂<strong> Exchange Modul</strong>e: [modules/exchange](https://github.com/InjectiveFoundation/injective-core/tree/master/injective-chain/modules/exchange)
+📂<strong> Exchange Modul</strong>e: [modules/exchange](https://github.com/InjectiveFoundation/injective-core/tree/c7b042e2b880bb49c8882f28627a1a6ee11a6e30/injective-chain/modules/exchange)
 
 📚<strong> Official Doc</strong>s: [docs.injective.network](https://docs.injective.network/)
 
