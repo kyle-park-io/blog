@@ -1,24 +1,24 @@
 ---
 title: 'Chain Communicator v2'
 date: 2026-11-03
-summary: '2024년에 직접 구현한 트랜잭션 전송 저장소를 기준으로, 2026년 백엔드가 Bitcoin, Ethereum, XRP Ledger, Solana, Sui, Cosmos와 통신하는 방식과 2025년과 2026년에 바뀐 점을 정리합니다.'
-tags: [blockchain, architecture, rpc, bitcoin, ethereum, solana, sui, cosmos, xrpl]
+summary: '2024년에 직접 구현한 트랜잭션 전송 저장소를 기준으로, 2026년 백엔드가 Bitcoin, Ethereum, XRP Ledger, Solana, TRON, Sui, Cosmos와 통신하는 방식과 2025년과 2026년에 바뀐 점을 정리합니다.'
+tags: [blockchain, architecture, rpc, bitcoin, ethereum, solana, tron, sui, cosmos, xrpl]
 lang: ko
 cover: ./cover.png
 ---
 안녕하세요. <strong>Kyle</strong>입니다.
 
-2024년에 [Chain Communicator](/blog/archive/chain-communicator)라는 글을 썼습니다. Tendermint 기반 체인 하나를 대상으로 트랜잭션 조립, 인코딩, 서명, RPC 호출을 라이브러리 없이 직접 구현한 기록이었습니다. 2년 사이에 체인들의 전송 방식과 확정 기준이 여러 번 바뀌어서, 같은 질문을 여섯 체인에 던지는 v2를 썼습니다.
+2024년에 [Chain Communicator](/blog/archive/chain-communicator)라는 글을 썼습니다. Tendermint 기반 체인 하나를 대상으로 트랜잭션 조립, 인코딩, 서명, RPC 호출을 라이브러리 없이 직접 구현한 기록이었습니다. 2년 사이에 체인들의 전송 방식과 확정 기준이 여러 번 바뀌어서, 같은 질문을 일곱 체인에 던지는 v2를 썼습니다.
 
 ---
 
 ## 0. TL;DR
 
-**첫째, 2024년 저장소의 흐름은 여섯 체인에 그대로 적용되지만, 저장소에 없던 두 단계가 운영에서 문제를 가릅니다.** 하나는 전파 응답과 확정을 나누는 일이고, 다른 하나는 이벤트를 구독으로 받고 놓친 구간을 조회로 메우는 일입니다.
+**첫째, 2024년 저장소의 흐름은 일곱 체인에 그대로 적용되지만, 저장소에 없던 두 단계가 운영에서 문제를 가릅니다.** 하나는 전파 응답과 확정을 나누는 일이고, 다른 하나는 이벤트를 구독으로 받고 놓친 구간을 조회로 메우는 일입니다.
 
-**둘째, 재전송 방지에 쓰는 값은 체인마다 다르고, 그 값은 서명 전에 서버가 읽어 두어야 하는 값입니다.** nonce와 chain id, 최근 blockhash, 객체 참조, Sequence와 만료 ledger, account_number와 sequence, 이미 쓴 UTXO가 각각 그 값입니다.
+**둘째, 재전송 방지에 쓰는 값은 체인마다 다르고, 그 값은 서명 전에 서버가 읽어 두어야 하는 값입니다.** nonce와 chain id, 최근 blockhash, 참조 블록과 만료 시각, 객체 참조, Sequence와 만료 ledger, account_number와 sequence, 이미 쓴 UTXO가 각각 그 값입니다.
 
-**셋째, 2025년과 2026년에 서버 코드가 직접 영향을 받는 변경이 여섯 체인 가운데 다섯 체인에 있었습니다.** Ethereum의 트랜잭션 타입 0x04와 트랜잭션당 가스 상한, Solana의 4,096바이트 트랜잭션과 Alpenglow, Sui의 JSON-RPC 중단, Cosmos SDK의 unordered 트랜잭션과 v0.55, Bitcoin Core 30의 데이터 출력 정책이 그 예입니다.
+**셋째, 2025년과 2026년에 서버 코드가 영향을 받는 변경이 일곱 체인 가운데 여섯 체인에 있었습니다.** Ethereum의 트랜잭션 타입 0x04와 트랜잭션당 가스 상한, Solana의 4,096바이트 트랜잭션과 Alpenglow, TRON 이벤트 플러그인 v3.0.0의 `removed` 필드, Sui의 JSON-RPC 중단, Cosmos SDK의 unordered 트랜잭션과 v0.55, Bitcoin Core 30의 데이터 출력 정책이 그 예입니다.
 
 ---
 
@@ -47,13 +47,13 @@ cover: ./cover.png
 
 ---
 
-## 2. 여섯 체인의 공통 파이프라인과 단계별 차이
+## 2. 일곱 체인의 공통 파이프라인과 단계별 차이
 
-체인 순서는 시가총액 순서입니다. [CoinPaprika `/v1/tickers`](https://api.coinpaprika.com/v1/tickers)의 2026-11-02 19:18 UTC 스냅샷에서 Bitcoin 1,546.07B, Ethereum 274.72B, XRP 78.63B, Solana 54.15B, Sui 3.60B, ATOM 0.55B 달러였습니다. 스테이블코인과 거래소 토큰은 이 글의 대상이 아니라서 건너뛰었습니다. 단일 출처의 단일 시점 값이라 날짜가 바뀌면 순서도 바뀔 수 있습니다.
+다루는 체인은 처음 정한 Bitcoin, Ethereum, XRP Ledger, Solana, Sui, Cosmos 여섯 체인에, 재전송을 막는 방식이 이 여섯 체인과 다른 TRON을 더한 일곱 체인입니다. 시가총액 순위로 고른 목록이 아니어서, 아래 스냅샷에서 Sui보다 순위가 높은 BNB Chain(BNB 4위), Hyperliquid(HYPE 10위), Dogecoin(DOGE 12위) 같은 체인은 다루지 않았습니다. 체인 순서는 시가총액 순서입니다. [CoinPaprika `/v1/tickers`](https://api.coinpaprika.com/v1/tickers)의 2026-11-03 02:02 UTC 스냅샷에서 Bitcoin 1,547.47B, Ethereum 275.35B, XRP 79.08B, Solana 54.36B, TRON 30.41B, Sui 3.59B, ATOM 0.56B 달러였습니다. 단일 출처의 단일 시점 값이라 날짜가 바뀌면 순서도 바뀔 수 있습니다.
 
 파이프라인은 조회, 조립과 인코딩, 서명, 전파, 확정 대기, 이벤트 읽기입니다. 아래 표는 체인마다 각 단계에 무엇을 끼우는지 모은 것이고, 이후 절은 이 표의 행을 하나씩 풀어 씁니다.
 
-![여섯 체인의 전송, 인코딩, 서명, 재전송 방지, 확정 기준, 이벤트를 모은 표](./image-02.png)
+![일곱 체인의 전송, 인코딩, 서명, 재전송 방지, 확정 기준, 이벤트를 모은 표](./image-02.png)
 
 표의 파란 칸은 체인마다 가장 크게 갈리는 재전송 방지와 확정 기준입니다.
 
@@ -117,7 +117,7 @@ Solana의 [RPC](https://github.com/solana-foundation/solana-com/blob/main/apps/d
 
 확정 기준은 commitment 레벨입니다. [RPC 문서](https://github.com/solana-foundation/solana-com/blob/main/apps/docs/content/docs/en/rpc/index.mdx)에서 `processed`는 노드가 처리한 가장 최신 블록으로 되돌려질 수 있고, `confirmed`는 전체 stake의 3분의 2를 넘는 투표를 받은 블록입니다.
 
-여섯 체인 가운데 2025년과 2026년에 서버가 대응할 변경이 가장 많았던 체인입니다. 첫째, [더 큰 트랜잭션](https://github.com/solana-foundation/solana-com/blob/main/apps/media/content/upgrades/larger-transaction-sizes.mdx)입니다. 최대 크기가 1,232바이트에서 4,096바이트로 늘었고, `txv1` 기능은 메인넷 에폭 1035가 시작한 2026-09-15 01:00 UTC 무렵에 활성화됐습니다. v1 형식은 보내는 쪽에서는 선택이지만 읽는 쪽에서는 필수라고 문서가 적었고, v1에는 Address Lookup Table가 없어서 계정 64개를 트랜잭션에 직접 넣습니다. 둘째, [Alpenglow](https://github.com/solana-foundation/solana-com/blob/main/apps/media/content/upgrades/alpenglow.mdx)입니다. 에폭 1064가 시작한 2026-10-21 13:36 UTC 무렵에 메인넷에 적용됐고, 최종성이 약 150ms를 목표로 합니다. 문서는 `confirmed`와 `finalized`가 같은 상태를 가리키니 새 코드는 `finalized`를 쓰라고 하고, `confirmed` 읽기는 이후 릴리스에서 제거된다고 적었습니다. 투표가 트랜잭션이 아니라 인증서로 바뀌었고, Geyser 스트림에는 `bank_id`가 추가돼 슬롯 하나에 블록이 하나라는 가정을 버려야 합니다. 같은 슬롯 안에서는 `(slot, bank_id)` 단위로 버퍼링하고, 여러 제공자의 스트림을 합칠 때는 `bank_id`가 노드 내부 카운터이므로 blockhash로 맞추라고 안내합니다.
+일곱 체인 가운데 2025년과 2026년에 서버가 대응할 변경이 가장 많았던 체인입니다. 첫째, [더 큰 트랜잭션](https://github.com/solana-foundation/solana-com/blob/main/apps/media/content/upgrades/larger-transaction-sizes.mdx)입니다. 최대 크기가 1,232바이트에서 4,096바이트로 늘었고, `txv1` 기능은 메인넷 에폭 1035가 시작한 2026-09-15 01:00 UTC 무렵에 활성화됐습니다. v1 형식은 보내는 쪽에서는 선택이지만 읽는 쪽에서는 필수라고 문서가 적었고, v1에는 Address Lookup Table가 없어서 계정 64개를 트랜잭션에 직접 넣습니다. 둘째, [Alpenglow](https://github.com/solana-foundation/solana-com/blob/main/apps/media/content/upgrades/alpenglow.mdx)입니다. 에폭 1064가 시작한 2026-10-21 13:36 UTC 무렵에 메인넷에 적용됐고, 최종성이 약 150ms를 목표로 합니다. 문서는 `confirmed`와 `finalized`가 같은 상태를 가리키니 새 코드는 `finalized`를 쓰라고 하고, `confirmed` 읽기는 이후 릴리스에서 제거된다고 적었습니다. 투표가 트랜잭션이 아니라 인증서로 바뀌었고, Geyser 스트림에는 `bank_id`가 추가돼 슬롯 하나에 블록이 하나라는 가정을 버려야 합니다. 같은 슬롯 안에서는 `(slot, bank_id)` 단위로 버퍼링하고, 여러 제공자의 스트림을 합칠 때는 `bank_id`가 노드 내부 카운터이므로 blockhash로 맞추라고 안내합니다.
 
 ### cf. durable nonce 폐지 예고
 
@@ -125,7 +125,29 @@ nonce 계정으로 blockhash 만료를 피하는 [durable nonce](https://github.
 
 ---
 
-## 7. Sui, 객체 참조가 순서를 정하고 gRPC가 중심이 된 접근 방식
+## 7. TRON, nonce 없이 참조 블록과 만료 시각을 서명하는 방식
+
+TRON 노드 소프트웨어 java-tron은 HTTP, gRPC, JSON-RPC 세 가지 API를 제공합니다. [API 문서](https://developers.tron.network/docs/api)에 따르면 HTTP(FullNode 8090)와 gRPC(50051)는 기본으로 켜져 있고, JSON-RPC(8545)는 설정에서 따로 켜야 합니다. HTTP 경로는 최신 head 블록을 읽는 `/wallet/`과 solidified 블록만 읽는 `/walletsolidity/`(8091)로 나뉩니다. 노드를 운영하지 않으면 호스팅 게이트웨이 TronGrid(`https://api.trongrid.io`)를 사용하고, 문서는 호출에 보통 `TRON-PRO-API-KEY`가 필요하다고 적었습니다.
+
+JSON-RPC는 Ethereum 메서드의 일부만 구현합니다. [JSON-RPC 개요](https://developers.tron.network/reference/json-rpc-api-overview)의 메서드 목록에는 `eth_sendRawTransaction`, `eth_getTransactionCount`, `eth_subscribe`가 없고, java-tron `develop` 브랜치의 [`TronJsonRpcImpl.java`](https://github.com/tronprotocol/java-tron/blob/develop/framework/src/main/java/org/tron/core/services/jsonrpc/TronJsonRpcImpl.java)는 앞의 두 메서드를 부르면 "does not exist/is not available" 예외를 던집니다. 거래는 TRON 전용 메서드 `buildTransaction`이나 HTTP, gRPC로 만들어 서명한 뒤 HTTP나 gRPC로 보냅니다. Ethereum용 클라이언트 코드를 엔드포인트만 바꿔 붙이면 조회까지만 되고 전송은 되지 않는다고 판단합니다.
+
+인코딩은 Protobuf입니다. java-tron의 [`Tron.proto`](https://github.com/tronprotocol/java-tron/blob/develop/protocol/src/main/protos/core/Tron.proto)에서 `Transaction`은 `raw_data`, `signature`, `ret`으로 이루어지고, `raw_data`에는 `ref_block_bytes`, `ref_block_hash`, `expiration`, `contract`, `timestamp`, `fee_limit`가 있으며 nonce 필드는 없습니다. `contract`는 반복 필드지만 지금은 하나만 지원한다고 주석에 적혀 있습니다. 서명은 secp256k1 ECDSA입니다. [서명 검증 문서](https://developers.tron.network/docs/transaction-signature-validation)에 따르면 서명 대상은 `SHA-256(raw_data)`이고 이 값이 txID입니다. 문서는 서명 해시가 Keccak-256과 다르다는 점과, 65바이트 서명을 `r || s || v` 순서로 넣어야 하므로 `v || r || s`로 다루는 Ethereum 도구의 코드를 옮길 때 순서를 바꾸라고 적었습니다.
+
+재전송 방지는 TAPOS(Transaction As Proof Of Stake)라고 부르는 참조 블록과 만료 시각입니다. [트랜잭션 문서](https://developers.tron.network/docs/tron-protocol-transaction)에 따르면 `ref_block_bytes`는 참조 블록 번호의 [6, 8) 바이트이고 `ref_block_hash`는 참조 블록 ID의 [8, 16) 바이트입니다. 노드는 최근 블록 저장소에서 그 번호의 블록을 찾아 해시를 비교하고, 참조 블록이 포크로 정식 체인에서 빠지면 거래를 `TAPOS_ERROR`로 거부합니다. `expiration`은 기본값이 최신 블록 시각에서 60초 뒤이고 최대 24시간이며, 기준 시각은 노드의 시계 대신 head 블록의 시각입니다. 같은 문서는 라이브러리가 관례로 가장 최근 solidified 블록을 참조 블록으로 쓴다고 설명하고, [서명과 전파 문서](https://developers.tron.network/docs/api-signature-and-broadcast-flow)는 거래를 만들고 서명하고 보내는 일을 약 50초 안에 끝내라고 권합니다. 서버가 서명 전에 읽을 값은 참조할 블록의 번호와 ID이고, 계정 nonce는 읽을 필요가 없습니다. 같은 서명 바이트는 txID가 같아서 다시 보내도 네트워크가 중복을 걸러 낸다고 서명과 전파 문서가 적었습니다.
+
+컨트랙트 호출에는 서버가 정할 값이 하나 더 있습니다. [fee_limit 문서](https://developers.tron.network/docs/set-feelimit)에 따르면 `fee_limit`는 호출자가 이 거래에 사용할 Energy 예산의 상한을 sun 단위로 정하는 필드이고, 컨트랙트 호출에서 필수이며, HTTP API에서 지정하지 않으면 0입니다. 실행이 끝나기 전에 필요한 Energy가 이 상한에 이르면 거래는 `OUT_OF_ENERGY`로 실패합니다. [스마트 컨트랙트 오류 문서](https://developers.tron.network/docs/smart-contract-errors)는 이때 상태 변경은 되돌려지지만 그 실행에 허용된 Energy는 모두 소비된다고 적었습니다. 상한의 최대값은 체인 파라미터 `getMaxFeeLimit`이고 지금 메인넷에서 15,000 TRX입니다.
+
+전파는 HTTP `/wallet/broadcasttransaction`이나 gRPC `Wallet.BroadcastTransaction`이고, 성공하면 `{"result": true, "txid": "..."}`를 돌려줍니다. [확인 의미 문서](https://developers.tron.network/docs/confirmation-semantics)는 `result: true`를 호출이 오류 없이 끝났다는 뜻으로만 설명하고, 거래가 대기열에 남았는지, 전파됐는지, 블록에 포함됐는지, 실행에 성공했는지, solidified됐는지는 이 응답으로 알 수 없다고 적었습니다. [전파 오류 문서](https://developers.tron.network/docs/broadcast-and-rpc-errors)는 요청이 시간 초과로 끝나면 노드가 거래를 받았는지 알 수 없고, `DUP_TRANSACTION_ERROR`도 거래가 체인에 올라갔다는 증거가 되지 않는다고 적었습니다. 원래 거래를 새 거래로 바꿔 보내기 전에는, 동기화된 노드의 최신 solidified 블록 시각이 원래 `expiration` 이상이 될 때까지 기다린 뒤 `/walletsolidity/gettransactionbyid`로 원래 txID를 조회하라고 서명과 전파 문서가 안내합니다. 같은 문서는 빈 응답 하나만으로는 포함되지 않았다고 판단할 수 없다고 적었습니다.
+
+확정은 solidified 블록입니다. [합의 문서](https://developers.tron.network/docs/concensus)에 따르면 투표로 뽑힌 SR(Super Representative) 27개가 3초 슬롯마다 돌아가며 블록을 만들고, 서로 다른 활성 SR 19개 이상이 그 높이 이상의 블록을 만들면 그 블록이 solidified되어 포크로 바뀌지 않습니다. 보통 약 1분이 걸리고, 활성 SR 19개 이상이 블록을 만들지 못하면 solidified가 멈추기 때문에 정해진 상한은 없다고 문서가 적었습니다. 컨트랙트 호출은 영수증이 있다는 것만으로 실행 성공이 되지 않습니다. 서명과 전파 문서는 `/walletsolidity/gettransactioninfobyid`의 최상위 `result`가 `FAILED`가 아니고 `receipt.result`가 `SUCCESS`인지까지 확인하라고 적었습니다. 저는 완료 처리를 solidified 블록과 영수증의 `SUCCESS`에 둡니다.
+
+이벤트를 받는 방법은 [이벤트 구독 문서](https://developers.tron.network/docs/event-subscription)에 TronGrid HTTPS 조회, 풀 노드에 들어 있는 ZeroMQ 발행, 자체 운영하는 Kafka·MongoDB 이벤트 플러그인으로 나와 있고, JSON-RPC에는 `eth_getLogs`와 폴링 필터(`eth_newFilter`, `eth_getFilterChanges`)가 있습니다. ZeroMQ는 실시간 전용이라 놓친 구간을 다시 받지 못합니다. 플러그인은 이벤트 서비스 프레임워크 V2.0에서 `event.subscribe.startSyncBlockNum`으로 정한 높이부터 지난 이벤트를 다시 보내고, 문서는 그 높이를 소비자가 마지막으로 처리한 높이보다 낮게 잡으면 중복이, 높게 잡으면 빈 구간이 생긴다고 적었습니다. API 문서는 거래소와 수탁 지갑에 `/walletsolidity/getblockbynum`으로 solidified 블록을 높이 순서대로 읽어 로컬 색인을 유지하는 방법을 안내합니다. `eth_getLogs`는 v4.8.2 기본 설정에서 한 번에 5,000블록까지 조회합니다.
+
+2025년과 2026년에 나온 java-tron [릴리스](https://github.com/tronprotocol/java-tron/releases)는 9개였고, 릴리스 노트에서 거래 형식, 서명 방식, solidified 기준을 바꾼 항목은 찾지 못했습니다. 서버가 대응할 변경은 이벤트와 API에 있었습니다. [GreatVoyage-v4.8.2](https://github.com/tronprotocol/java-tron/releases/tag/GreatVoyage-v4.8.2)(2026-07-15, 필수 업그레이드)는 Kafka·MongoDB 플러그인 사용자에게 Event Plugin v3.0.0 이상을 요구합니다. [Event Plugin v3.0.0](https://github.com/tronprotocol/event-plugin/releases/tag/v3.0.0) 릴리스 노트는 블록과 거래 이벤트에 체인 재구성으로 지워진 이벤트를 알리는 `removed` 필드를 더했고, 소비자가 `removed=true`를 롤백 신호로 다뤄 하위 상태를 고치라고 적었습니다. 스키마를 엄격하게 검사하는 소비자는 이 필드를 받도록 바꿔야 합니다. [GreatVoyage-v4.8.0](https://github.com/tronprotocol/java-tron/releases/tag/GreatVoyage-v4.8.0)(2025-04-29)은 이벤트 서비스 프레임워크 V2.0, JSON-RPC의 `finalized` 블록 태그, 로그 조회 범위 제한을 넣었고, [TIP-694](https://github.com/tronprotocol/tips/blob/master/tip-694.md)로 만료 검사를 「head 블록 시각보다 큰가」에서 「다음 블록 슬롯 시각보다 큰가」로 바꾸는 규칙을 넣었습니다. 이 규칙은 제안 투표로 켜는 방식이라 메인넷에서 켜졌는지는 확인하지 못했습니다. [GreatVoyage-v4.8.1](https://github.com/tronprotocol/java-tron/releases/tag/GreatVoyage-v4.8.1)(2026-02-04)은 `eth_getBlockReceipts`를 더했습니다.
+
+---
+
+## 8. Sui, 객체 참조가 순서를 정하고 gRPC가 중심이 된 접근 방식
 
 Sui는 데이터 접근 방식이 크게 바뀌었습니다. [JSON-RPC 이전 안내](https://docs.sui.io/develop/accessing-data/json-rpc-migration)는 Sui Foundation 메인넷 풀 노드에서 JSON-RPC를 2026년 7월 27일이 있는 주에 껐다고 적었고, 코드 제거를 포함한 완전한 폐기는 2026년 10월 중순으로 계획한다고 적었습니다. 2026-11-03에 받은 문서에도 완전한 폐기는 계획으로 적혀 있습니다. 대체는 [gRPC](https://docs.sui.io/develop/accessing-data/grpc/what-is-grpc)와 [GraphQL RPC](https://docs.sui.io/develop/accessing-data/graphql/graphql-rpc)이고, 두 문서 모두 일반 제공(GA)이라고 적었습니다. 전파는 `sui_executeTransactionBlock`이 아니라 gRPC의 `TransactionExecutionService.ExecuteTransaction`이나 GraphQL의 `Mutation.executeTransaction`입니다.
 
@@ -139,7 +161,7 @@ Sui는 데이터 접근 방식이 크게 바뀌었습니다. [JSON-RPC 이전 �
 
 ---
 
-## 8. Cosmos, 2024년 저장소와 가장 가까운 SignDoc 구조
+## 9. Cosmos, 2024년 저장소와 가장 가까운 SignDoc 구조
 
 Cosmos 체인은 세 가지 통신 경로가 있습니다. [문서](https://github.com/cosmos/cosmos-sdk/blob/main/docs/docs/learn/advanced/06-grpc_rest.md)의 기본 포트는 gRPC 9090, REST 1317(gRPC-gateway), CometBFT RPC 26657입니다. CometBFT는 JSON-RPC에 더해 gRPC API를 v1부터 제공하기로 한 [ADR 106](https://github.com/cometbft/cometbft/blob/main/docs/references/architecture/adr-106-grpc-api.md)(상태: Accepted)이 있습니다.
 
@@ -155,40 +177,40 @@ Cosmos 체인은 세 가지 통신 경로가 있습니다. [문서](https://gith
 
 ---
 
-## 9. 서명 전에 서버가 읽어야 하는 재전송 방지 값
+## 10. 서명 전에 서버가 읽어야 하는 재전송 방지 값
 
-여섯 체인의 재전송 방지 값을 한 표에 모으면 서버가 서명 전에 읽을 값이 같이 정리됩니다. 아래 도식은 서명한 바이트에 묶인 값, 순서나 만료 규칙, 서명 전에 읽을 값을 체인별로 나눈 것입니다.
+일곱 체인의 재전송 방지 값을 한 표에 모으면 서버가 서명 전에 읽을 값이 같이 정리됩니다. 아래 도식은 서명한 바이트에 묶인 값, 순서나 만료 규칙, 서명 전에 읽을 값을 체인별로 나눈 것입니다.
 
 ![재전송 방지에 쓰는 값을 체인별로 정리한 표](./image-03.png)
 
-파란 칸이 서명한 바이트에 들어가는 값입니다. 서버 설계에서 이 값은 읽는 시점과 쓰는 시점 사이에 바뀔 수 있는 값이라는 공통점이 있습니다. Ethereum과 Cosmos의 nonce, sequence는 다른 요청이 먼저 쓰면 바뀌고, Solana의 blockhash는 150 slot이 지나면 못 쓰고, Sui의 객체 참조는 다른 거래가 같은 객체를 수정하면 바뀌며, Bitcoin의 UTXO는 다른 거래가 쓰면 사라집니다. 읽은 값을 쓰는 순간까지 지키는 장치가 서버에 필요하고, pay-lab에서는 그 장치가 advisory lock과 지갑별 nonce 표였습니다.
+파란 칸이 서명한 바이트에 들어가는 값입니다. 서버 설계에서 이 값은 읽는 시점과 쓰는 시점 사이에 바뀔 수 있는 값이라는 공통점이 있습니다. Ethereum과 Cosmos의 nonce, sequence는 다른 요청이 먼저 쓰면 바뀌고, Solana의 blockhash는 150 slot이 지나면 못 쓰고, TRON의 참조 블록은 포크로 정식 체인에서 빠지면 거부되며 만료 시각은 기본 60초 뒤에 지나고, Sui의 객체 참조는 다른 거래가 같은 객체를 수정하면 바뀌며, Bitcoin의 UTXO는 다른 거래가 쓰면 사라집니다. 읽은 값을 쓰는 순간까지 지키는 장치가 서버에 필요하고, pay-lab에서는 그 장치가 advisory lock과 지갑별 nonce 표였습니다.
 
 ---
 
-## 10. 전파 응답과 확정, 서로 다른 두 사건
+## 11. 전파 응답과 확정, 서로 다른 두 사건
 
-2024년 저장소는 `broadcast_tx_commit` 응답을 완료로 취급했습니다. XRP Ledger 문서는 `submit`의 성공 응답을 서버가 후보 거래를 받았다는 뜻으로 설명하고, Cosmos의 sync와 async 응답도 블록 커밋 이전의 결과입니다. 전파 응답과 확정을 가르는 일은 서버가 맡아야 합니다. 아래 도식은 체인마다 전파 직후부터 확정까지 거치는 단계를 놓고, 제가 서버에서 완료로 처리할 단계에 별표를 달았습니다.
+2024년 저장소는 `broadcast_tx_commit` 응답을 완료로 취급했습니다. XRP Ledger 문서는 `submit`의 성공 응답을 서버가 후보 거래를 받았다는 뜻으로 설명하고, TRON 문서는 `broadcasttransaction`의 `result: true`를 호출이 오류 없이 끝났다는 뜻으로만 설명하며, Cosmos의 sync와 async 응답도 블록 커밋 이전의 결과입니다. 전파 응답과 확정을 가르는 일은 서버가 맡아야 합니다. 아래 도식은 체인마다 전파 직후부터 확정까지 거치는 단계를 놓고, 제가 서버에서 완료로 처리할 단계에 별표를 달았습니다.
 
 ![체인별 전파 직후부터 확정까지의 단계와 완료로 처리할 단계](./image-04.png)
 
-별표 단계는 모두 문서가 되돌려지지 않는다고 적은 단계는 아닙니다. Bitcoin의 6 확인은 개발자 가이드가 위험을 낮추는 단계로 설명한 예이고, 어느 단계에서 완료로 처리할지는 금액과 서비스에 따라 서버가 정하는 값입니다. Solana는 Alpenglow 이후 `confirmed`와 `finalized`가 같아져서 이 선택지가 하나로 줄었습니다. Cosmos의 commit 방식 호출은 CheckTx와 DeliverTx 응답을 함께 돌려주지만 CometBFT 문서가 테스트와 개발용으로만 쓰라고 표시했기 때문에 도식에서 뺐습니다.
+별표 단계는 모두 문서가 되돌려지지 않는다고 적은 단계는 아닙니다. Bitcoin의 6 확인은 개발자 가이드가 위험을 낮추는 단계로 설명한 예이고, 어느 단계에서 완료로 처리할지는 금액과 서비스에 따라 서버가 정하는 값입니다. Solana는 Alpenglow 이후 `confirmed`와 `finalized`가 같아져서 이 선택지가 하나로 줄었습니다. TRON의 solidified는 보통 약 1분이 걸리지만 합의 문서는 정해진 상한이 없다고 적었습니다. Cosmos의 commit 방식 호출은 CheckTx와 DeliverTx 응답을 함께 돌려주지만 CometBFT 문서가 테스트와 개발용으로만 쓰라고 표시했기 때문에 도식에서 뺐습니다.
 
 ---
 
-## 11. 오늘 다시 만들 때 서버에 넣을 규칙 네 가지
+## 12. 오늘 다시 만들 때 서버에 넣을 규칙 네 가지
 
 1. 서명 전에 읽는 값을 쓰기 전까지 지킵니다. nonce와 sequence는 지갑마다 직렬화합니다. pay-lab에서는 advisory lock과 지갑별 nonce 표로 처리했습니다.
-2. 전파 전에 기록을 먼저 남깁니다. pay-lab의 충전은 행사와 주소를 키로 한 기록을 넣은 뒤에 보내서, 같은 요청을 다시 받아도 두 번 보내지 않습니다.
-3. 해시가 없는 기록은 바로 풀지 않습니다. 전파 도중에 서버가 멈추면 보냈는지 알 수 없는 기록이 남습니다. pay-lab에서는 그런 기록을 지갑의 대기 중인 트랜잭션과 그 주소로 간 Transfer를 확인한 뒤에만 풀어 줍니다.
-4. 이벤트는 구독으로 받고 조회로 메웁니다. Sui 문서가 권하는 순서(구독을 열고, 첫 Watermark를 기록하고, 그 지점까지 조회로 채우고, 열린 구독을 이어 읽는 순서)를 체인마다 해당 메서드로 바꿔 쓸 수 있다고 판단합니다. Ethereum은 `eth_subscribe`와 `eth_getLogs`, Bitcoin은 ZMQ나 Electrum 구독과 조회가 짝입니다.
+2. 전파 전에 기록을 먼저 남깁니다. pay-lab의 충전은 회차와 주소를 키로 한 기록을 넣은 뒤에 보내서, 같은 요청을 다시 받아도 두 번 보내지 않습니다.
+3. 해시가 없는 기록은 바로 풀지 않습니다. 전파 도중에 서버가 멈추면 보냈는지 알 수 없는 기록이 남습니다. pay-lab에서는 그런 기록을 지갑의 대기 중인 트랜잭션과 그 주소로 간 Transfer를 확인한 뒤에만 풀어 줍니다. TRON 문서가 안내하는 대체 거래 순서도 solidified 블록 시각이 원래 만료 시각을 지난 뒤 원래 txID를 조회하는 것이라 같은 원칙입니다.
+4. 이벤트는 구독으로 받고 조회로 메웁니다. Sui 문서가 권하는 순서(구독을 열고, 첫 Watermark를 기록하고, 그 지점까지 조회로 채우고, 열린 구독을 이어 읽는 순서)를 체인마다 해당 메서드로 바꿔 쓸 수 있다고 판단합니다. Ethereum은 `eth_subscribe`와 `eth_getLogs`, Bitcoin은 ZMQ나 Electrum 구독과 조회, TRON은 이벤트 플러그인과 `/walletsolidity/getblockbynum` 스캔이 짝입니다.
 
 ---
 
 ## 정리
 
-**① 흐름은 같고 부품이 다릅니다.** 조회, 조립, 서명, 전파, 확정 대기, 이벤트 읽기라는 틀은 여섯 체인에서 같고, 체인마다 갈리는 것은 재전송 방지 값과 확정 기준입니다.
+**① 흐름은 같고 부품이 다릅니다.** 조회, 조립, 서명, 전파, 확정 대기, 이벤트 읽기라는 틀은 일곱 체인에서 같고, 체인마다 갈리는 것은 재전송 방지 값과 확정 기준입니다.
 
-**② 전파 응답은 확정이 아닙니다.** 2024년 저장소가 `broadcast_tx_commit`에 맡긴 확정 대기는 체인별 기준(finalized, validated ledger, certified effects, 블록 커밋, 확인 수)으로 따로 구현해야 합니다.
+**② 전파 응답은 확정이 아닙니다.** 2024년 저장소가 `broadcast_tx_commit`에 맡긴 확정 대기는 체인별 기준(finalized, validated ledger, solidified 블록, certified effects, 블록 커밋, 확인 수)으로 따로 구현해야 합니다.
 
 **③ 재전송 방지 값은 서버에서 지켜야 하는 값입니다.** 읽은 값이 쓰기 전에 바뀔 수 있어서, 직렬화와 기록이 서버의 일입니다.
 
@@ -199,15 +221,16 @@ Cosmos 체인은 세 가지 통신 경로가 있습니다. [문서](https://gith
 ## 측정 기준과 출처
 
 - **모든 원문 확인 시각**: 2026-11-03 KST. 원문은 GitHub raw 문서와 공식 문서 사이트에서 직접 받았고, 인용한 문장은 받은 파일에서 다시 찾았습니다.
-- **시가총액 순서**: [CoinPaprika `/v1/tickers`](https://api.coinpaprika.com/v1/tickers), `last_updated` 2026-11-02 19:18 UTC. 단일 출처, 단일 시점
+- **시가총액 순서**: [CoinPaprika `/v1/tickers`](https://api.coinpaprika.com/v1/tickers), `last_updated` 2026-11-03 02:02 UTC. 단일 출처, 단일 시점
 - **2024 저장소**: [kyle-park-io/chain-communicator](https://github.com/kyle-park-io/chain-communicator), 2026-11-03 GitHub API 기준 최초 생성 2024-05-07, 마지막 푸시 2024-08-29
 - **Bitcoin**: [개발자 가이드](https://developer.bitcoin.org/devguide/block_chain.html), [sendrawtransaction](https://developer.bitcoin.org/reference/rpc/sendrawtransaction.html), [BIP-141](https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki), [BIP-143](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki), [BIP-174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki), [BIP-340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki), [BIP-341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki), [Electrum protocol-methods](https://github.com/spesmilo/electrum-protocol/blob/master/docs/protocol-methods.rst), [Esplora API](https://github.com/Blockstream/esplora/blob/master/API.md), [Core 30.0 릴리스 노트](https://github.com/bitcoin/bitcoin/blob/master/doc/release-notes/release-notes-30.0.md)
 - **Ethereum**: [EIP-155](https://eips.ethereum.org/EIPS/eip-155), [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559), [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718), [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930), [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844), [EIP-7594](https://eips.ethereum.org/EIPS/eip-7594), [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702), [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825), [execution-apis](https://github.com/ethereum/execution-apis), ethereum.org의 [Pectra](https://ethereum.org/roadmap/pectra/)와 [Fusaka](https://ethereum.org/roadmap/fusaka/) 페이지(적용일은 이 페이지 문장 기준이고 클라이언트 릴리스 노트로 확인하지 않았습니다)
 - **XRP Ledger**: [xrpl.org 문서](https://xrpl.org/docs)(소스는 XRPLF/xrpl-dev-portal)
 - **Solana**: [solana-foundation/solana-com 문서 소스](https://github.com/solana-foundation/solana-com). solana.com 대신 GitHub에 있는 문서 소스를 읽었고, 렌더링된 사이트와 `main` 브랜치 소스가 같은지는 확인하지 못했습니다.
+- **TRON**: [developers.tron.network](https://developers.tron.network/docs/api) 문서(페이지마다 문서 사이트가 제공하는 마크다운 판을 받아 읽음), [java-tron](https://github.com/tronprotocol/java-tron) `develop` 브랜치 소스와 [릴리스 노트](https://github.com/tronprotocol/java-tron/releases), [TIP-694](https://github.com/tronprotocol/tips/blob/master/tip-694.md), [Event Plugin v3.0.0](https://github.com/tronprotocol/event-plugin/releases/tag/v3.0.0)
 - **Sui**: [docs.sui.io](https://docs.sui.io)
 - **Cosmos**: [cosmos-sdk](https://github.com/cosmos/cosmos-sdk), [cometbft](https://github.com/cometbft/cometbft) 소스 문서. CometBFT 공식 문서 사이트 대신 GitHub 소스를 읽었습니다.
-- **확인하지 못한 것**: Sui JSON-RPC 완전 폐기의 이행 여부, Solana와 XRP Ledger의 조회 보충 메서드, Ethereum 하드포크 적용일의 클라이언트 릴리스 노트 대조
+- **확인하지 못한 것**: Sui JSON-RPC 완전 폐기의 이행 여부, Solana와 XRP Ledger의 조회 보충 메서드, Ethereum 하드포크 적용일의 클라이언트 릴리스 노트 대조, TRON TIP-694 만료 규칙의 메인넷 적용 여부, TRON solidified에 걸리는 시간의 실측, java-tron JSON-RPC 메서드 구현의 릴리스 태그 대조(`develop` 브랜치만 읽음)
 
 ---
 
