@@ -26,8 +26,10 @@ const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // Directory names the site already uses under /blog (jungho.dev/blog/en is
 // the English list, /blog/tags/<tag> a tag page, /blog/archive/<slug> an
 // archived post, /blog/rss.xml the feed, /blog/index.json the homepage's
-// data). A post with one of these slugs would collide with that page.
-const RESERVED_SLUGS = new Set(['en', 'tags', 'archive', 'rss', 'index']);
+// data, /blog/404 the not-found page the server answers every missing
+// address with). A post with one of these slugs would collide with that
+// page; a post named 404 would replace the not-found page itself.
+const RESERVED_SLUGS = new Set(['en', 'tags', 'archive', 'rss', 'index', '404']);
 
 /** Minimal frontmatter reader: `key: value` pairs, `[a, b]` arrays, and
  *  YAML block sequences (`key:` followed by `- item` lines). */

@@ -7,7 +7,8 @@ kebab-case and must not change after publishing; changing one breaks every
 link to the post.
 
 A few names are taken by the blog's own pages and are rejected as slugs:
-`en` (the English list at `/blog/en`), `tags`, `archive`, `rss` and `index`.
+`en` (the English list at `/blog/en`), `tags`, `archive`, `rss`, `index` and
+`404` (the page shown for a missing address).
 
 Images live next to the post and are referenced relatively:
 
