@@ -226,3 +226,19 @@ test('supersededBy on a post that is not archived is reported', () => {
     },
   );
 });
+
+test('a slug that collides with a blog route is reported', () => {
+  for (const slug of ['en', 'tags', 'archive', 'rss', 'index']) {
+    withPosts({ [slug]: valid }, (root) => {
+      assert.deepEqual(validatePosts(root), [
+        `${slug}/index.md: slug "${slug}" is reserved for a blog route`,
+      ]);
+    });
+  }
+});
+
+test('a slug that only starts with a reserved word is fine', () => {
+  withPosts({ 'en-route': valid, 'tags-explained': valid }, (root) => {
+    assert.deepEqual(validatePosts(root), []);
+  });
+});

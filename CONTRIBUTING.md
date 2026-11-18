@@ -6,6 +6,9 @@ is the URL - `content/posts/ethereum-event-object` is served at
 kebab-case and must not change after publishing; changing one breaks every
 link to the post.
 
+A few names are taken by the blog's own pages and are rejected as slugs:
+`en` (the English list at `/blog/en`), `tags`, `archive`, `rss` and `index`.
+
 Images live next to the post and are referenced relatively:
 
     content/posts/my-post/
@@ -26,7 +29,7 @@ Images live next to the post and are referenced relatively:
 | `tags`    | yes      | Lowercase kebab-case array. `[]` is allowed                                        |
 | `cover`   | no       | `./cover.webp`. The file must exist                                                |
 | `draft`   | no       | `true` hides it from the published site                                            |
-| `lang`    | no       | `ko` (default) or `en`                                                             |
+| `lang`    | no       | `ko` (default) or `en`. Decides the list: `ko` posts are at `/blog`, `en` posts at `/blog/en` |
 | `archived` | no      | `true` takes the post off the list, tags, RSS and sitemap and serves it at `/blog/archive/<slug>` |
 | `supersededBy` | no  | Slug of the post that replaces an archived one. Linked from the archived copy        |
 
