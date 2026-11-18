@@ -23,6 +23,11 @@ const KNOWN: ReadonlySet<string> = new Set<string>([...REQUIRED, ...OPTIONAL]);
 const ARRAY_FIELDS: ReadonlySet<string> = new Set(['tags']);
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// Directory names the site already uses under /blog (jungho.dev/blog/en is
+// the English list, /blog/tags/<tag> a tag page, /blog/archive/<slug> an
+// archived post, /blog/rss.xml the feed, /blog/index.json the homepage's
+// data). A post with one of these slugs would collide with that page.
+const RESERVED_SLUGS = new Set(['en', 'tags', 'archive', 'rss', 'index']);
 
 /** Minimal frontmatter reader: `key: value` pairs, `[a, b]` arrays, and
  *  YAML block sequences (`key:` followed by `- item` lines). */
@@ -147,6 +152,8 @@ export function validatePosts(root: string): string[] {
 
     if (!KEBAB.test(slug))
       at(`directory name "${slug}" must be lowercase kebab-case`);
+    if (RESERVED_SLUGS.has(slug))
+      at(`slug "${slug}" is reserved for a blog route`);
     if (seen.has(slug)) at(`duplicate slug "${slug}"`);
     seen.add(slug);
 
