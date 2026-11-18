@@ -228,7 +228,7 @@ test('supersededBy on a post that is not archived is reported', () => {
 });
 
 test('a slug that collides with a blog route is reported', () => {
-  for (const slug of ['en', 'tags', 'archive', 'rss', 'index']) {
+  for (const slug of ['en', 'tags', 'archive', 'rss', 'index', '404']) {
     withPosts({ [slug]: valid }, (root) => {
       assert.deepEqual(validatePosts(root), [
         `${slug}/index.md: slug "${slug}" is reserved for a blog route`,
