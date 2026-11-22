@@ -28,8 +28,8 @@ Paths are counted from the repo root.
 | [`.husky/`](.husky/) | git hooks: commit-msg runs commitlint, pre-commit runs validate and typecheck |
 | [`__tests__/`](__tests__/) | node tests for scripts/validate-frontmatter.ts and scripts/cron-update-blog.sh |
 | [`content/`](content/) | everything that is published |
-| &emsp;&emsp;[`posts/`](content/posts/) | one folder per post; the folder name is the URL slug |
-| &emsp;&emsp;&emsp;&emsp;`<slug>/` | index.md with frontmatter, plus the post's cover and images |
+| &nbsp;&nbsp;&nbsp;&nbsp;[`posts/`](content/posts/) | one folder per post; the folder name is the URL slug |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`<slug>/` | index.md with frontmatter, plus the post's cover and images |
 | [`cron/`](cron/) | the crontab file installed in the container |
 | [`notion/`](notion/) | curl scripts that call the Notion API (pages, blocks, users); the key is read from an untracked api_key.txt |
 | [`scripts/`](scripts/) | validate-frontmatter.ts, cron-update-blog.sh (pull and rebuild when HEAD changed), cron-init.sh (install the crontab) |
