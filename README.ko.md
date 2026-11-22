@@ -23,15 +23,17 @@ yarn test           # __tests__/*.test.ts를 node --test로 실행
 
 경로는 레포 맨 위 폴더에서 셉니다.
 
-- [`.husky/`](.husky/) git 훅: commit-msg는 commitlint, pre-commit은 validate와 typecheck를 실행
-- [`__tests__/`](__tests__/) scripts/validate-frontmatter.ts와 scripts/cron-update-blog.sh의 node 테스트
-- [`content/`](content/) 발행하는 모든 내용
-  - [`posts/`](content/posts/) 글마다 폴더 하나. 폴더 이름이 URL 슬러그
-    - `<slug>/` frontmatter가 붙은 index.md와 그 글의 표지, 이미지
-- [`cron/`](cron/) 컨테이너에 설치하는 crontab 파일
-- [`notion/`](notion/) Notion API를 부르는 curl 스크립트(페이지, 블록, 사용자). 키는 git에 올리지 않는 api_key.txt에서 읽음
-- [`scripts/`](scripts/) validate-frontmatter.ts, cron-update-blog.sh(HEAD가 바뀌면 pull하고 재빌드), cron-init.sh(crontab 설치)
-- [`.commitlintrc`](.commitlintrc) commitlint 설정, conventional commits
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) 글을 쓰고, 보관하고, 발행하는 법
-- [`git.sh`](git.sh) 이 클론의 로컬 git 사용자 이름과 이메일 설정
-- [`init.sh`](init.sh) yarn 프로젝트와 husky 훅의 첫 설정
+| 경로 | 설명 |
+|---|---|
+| [`.husky/`](.husky/) | git 훅: commit-msg는 commitlint, pre-commit은 validate와 typecheck를 실행 |
+| [`__tests__/`](__tests__/) | scripts/validate-frontmatter.ts와 scripts/cron-update-blog.sh의 node 테스트 |
+| [`content/`](content/) | 발행하는 모든 내용 |
+| &emsp;&emsp;[`posts/`](content/posts/) | 글마다 폴더 하나. 폴더 이름이 URL 슬러그 |
+| &emsp;&emsp;&emsp;&emsp;`<slug>/` | frontmatter가 붙은 index.md와 그 글의 표지, 이미지 |
+| [`cron/`](cron/) | 컨테이너에 설치하는 crontab 파일 |
+| [`notion/`](notion/) | Notion API를 부르는 curl 스크립트(페이지, 블록, 사용자). 키 파일은 git에 올리지 않는 api_key.txt |
+| [`scripts/`](scripts/) | validate-frontmatter.ts, cron-update-blog.sh(HEAD가 바뀌면 pull하고 재빌드), cron-init.sh(crontab 설치) |
+| [`.commitlintrc`](.commitlintrc) | commitlint 설정, conventional commits |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 글을 쓰고, 보관하고, 발행하는 법 |
+| [`git.sh`](git.sh) | 이 클론의 로컬 git 사용자 이름과 이메일 설정 |
+| [`init.sh`](init.sh) | yarn 프로젝트와 husky 훅의 첫 설정 |
