@@ -23,17 +23,15 @@ yarn test           # node --test over __tests__/*.test.ts
 
 Paths are counted from the repo root.
 
-```
-.husky/                    git hooks: commit-msg runs commitlint, pre-commit runs validate and typecheck
-__tests__/                 node tests for scripts/validate-frontmatter.ts and scripts/cron-update-blog.sh
-content/                   everything that is published
-  posts/                   one folder per post; the folder name is the URL slug
-    <slug>/                index.md with frontmatter, plus the post's cover and images
-cron/                      the crontab file installed in the container
-notion/                    curl scripts that call the Notion API (pages, blocks, users); the key is read from an untracked api_key.txt
-scripts/                   validate-frontmatter.ts, cron-update-blog.sh (pull and rebuild when HEAD changed), cron-init.sh (install the crontab)
-.commitlintrc              commitlint config, conventional commits
-CONTRIBUTING.md            how to write, archive and publish a post
-git.sh                     sets the local git user name and email for this clone
-init.sh                    first-time setup of the yarn project and the husky hooks
-```
+- [`.husky/`](.husky/) git hooks: commit-msg runs commitlint, pre-commit runs validate and typecheck
+- [`__tests__/`](__tests__/) node tests for scripts/validate-frontmatter.ts and scripts/cron-update-blog.sh
+- [`content/`](content/) everything that is published
+  - [`posts/`](content/posts/) one folder per post; the folder name is the URL slug
+    - `<slug>/` index.md with frontmatter, plus the post's cover and images
+- [`cron/`](cron/) the crontab file installed in the container
+- [`notion/`](notion/) curl scripts that call the Notion API (pages, blocks, users); the key is read from an untracked api_key.txt
+- [`scripts/`](scripts/) validate-frontmatter.ts, cron-update-blog.sh (pull and rebuild when HEAD changed), cron-init.sh (install the crontab)
+- [`.commitlintrc`](.commitlintrc) commitlint config, conventional commits
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) how to write, archive and publish a post
+- [`git.sh`](git.sh) sets the local git user name and email for this clone
+- [`init.sh`](init.sh) first-time setup of the yarn project and the husky hooks
