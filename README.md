@@ -37,3 +37,7 @@ Paths are counted from the repo root.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | how to write, archive and publish a post |
 | [`git.sh`](git.sh) | sets the local git user name and email for this clone |
 | [`init.sh`](init.sh) | first-time setup of the yarn project and the husky hooks |
+
+## License
+
+This repository is public for reading. All rights reserved by Kyle Park.

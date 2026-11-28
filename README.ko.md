@@ -37,3 +37,7 @@ yarn test           # __tests__/*.test.ts를 node --test로 실행
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 글을 쓰고, 보관하고, 발행하는 법 |
 | [`git.sh`](git.sh) | 이 클론의 로컬 git 사용자 이름과 이메일 설정 |
 | [`init.sh`](init.sh) | yarn 프로젝트와 husky 훅의 첫 설정 |
+
+## 라이선스
+
+읽기 위해 공개한 레포입니다. 모든 권리는 Kyle Park에게 있습니다.
